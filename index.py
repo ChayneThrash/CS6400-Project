@@ -70,6 +70,7 @@ def get_search_total(user, beer_name, brewery_name, styles, exclude_rated):
                                 ELSE style.Style in {Styles}
                             END
                     optional match (u:User {ProfileName: {Username}})-[r:REVIEWED]->(beer)
+                    WITH    beer, r
                     WHERE   NOT {ExcludeRated} OR r is null
                     return  count(distinct beer) as TotalBeers''',
                              Username=user, BreweryName=brewery_name_regex, BeerName=beer_name_regex, Styles=styles,
@@ -91,6 +92,7 @@ def get_search_results(user, beer_name, brewery_name, styles, exclude_rated, res
                             ELSE style.Style in {Styles}
                         END
                 optional match (u:User {ProfileName: {Username}})-[r:REVIEWED]->(beer)
+                WITH    brewery, beer, style, r
                 WHERE   NOT {ExcludeRated} OR r is null
                 WITH    brewery, beer, style, 
                         CASE 
