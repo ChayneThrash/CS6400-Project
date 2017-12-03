@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Beer Recommendations</title>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+    <style>
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            padding-top: 100px; /* Location of the box */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgb(0,0,0); /* Fallback color */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+
+        /* The Close Button */
+        .close {
+            color: #aaaaaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        </style>
+    <script>
+        $(document).ready(function() {
+            $("#SearchButton").click(search);
+            getBeerStyles(function(results) {
+                var resultsKeys = Object.keys(results);
+                resultsKeys.sort();
+                $.each(resultsKeys, function(index, specific) {
+                    var styles = results[specific];
+                    var optGroup = $('<optgroup label="' + specific + '" />');
+                    $.each(styles, (i, style) => {
+                        var option = $("<option></option>");
+                        option.attr("value",style).text(style);
+                        optGroup.append(option);
+                    });
+
+                    optGroup.click(() => {
+                        optGroup.children("option").prop("selected", "selected");
+                    });
+                    $('#StylesDropdown').append(optGroup);
+                });
+            });
+        });
+
+        function getBeerStyles(next) {
+            $.ajax(
+            {
+                url: "/getStyles",
+                method: "POST",
+                success: next
+            });
+        }
+
+        function search() {
+            $.ajax(
+            {
+                url: "/search",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(
+                {
+                    breweryName: $("#BreweryTextBox").val(),
+                    beerName: $("#BeerTextBox").val(),
+                    styles: $("#StylesDropdown").val().filter(style => style),
+                    excludeRated: $("#ExcludeRatedCheckbox").is(":checked")
+                }),
+                success: drawSearchResults
+            });
+        }
+
+        function drawSearchResults(results) {
+            $("#SearchResultsTable tbody tr").remove();
+            $("#TotalResults").text("Total: " + results.total);
+            $("#TotalResults").removeAttr("hidden");
+            $.each(results.items, (index, value) =>
+            {
+                var row = document.getElementById("SearchResultsTable").tBodies[0].insertRow(-1);
+                row.setAttribute("value", value.beerId);
+
+                var breweryCell = row.insertCell(0);
+                var beerCell = row.insertCell(1);
+                var styleCell = row.insertCell(2);
+                var ratingCell = row.insertCell(3);
+                var addRatingCell = row.insertCell(4);
+
+                breweryCell.innerHTML = value.brewery;
+                beerCell.innerHTML = value.beer;
+                styleCell.innerHTML = value.style;
+
+                var ratingLink = document.createElement('a');
+                ratingLink.onclick = () => openModal(value.beerId);
+                ratingLink.href = "#";
+                var linkText;
+                if (value.rating < 0) {
+                    ratingCell.innerHTML = "N/A"
+                    linkText = document.createTextNode("Add Rating");
+                } else {
+                    ratingCell.innerHTML = value.rating;
+                    linkText = document.createTextNode("Update Rating");
+                }
+                ratingLink.appendChild(linkText);
+
+                addRatingCell.appendChild(ratingLink);
+            });
+        }
+
+        function closeModal() {
+            $("#RateModal").hide();
+        }
+
+        function openModal(beerToRate) {
+            $("#RateModal").show();
+            $("#SubmitRatingButton").click(() => {
+                var rating = {
+                    overall: parseFloat($("#OverallRatingSelect").val()),
+                    palate: parseFloat($("#PalateRatingSelect").val()),
+                    taste: parseFloat($("#TasteRatingSelect").val()),
+                    aroma: parseFloat($("#AromaRatingSelect").val()),
+                    appearance: parseFloat($("#AppearanceRatingSelect").val())
+                };
+                addRating(beerToRate, rating, result => closeModal());
+            });
+        }
+
+        function addRating(beerToRate, rating, next) {
+            $.ajax(
+            {
+                url: "/rate",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(
+                {
+                    rating: rating,
+                    beer: beerToRate
+                }),
+                success: next
+            });
+        }
+
+    </script>
+</head>
+<body>
+
+<div id="SearchContainer">
+    <select multiple id="StylesDropdown">
+        <option value="" selected disabled>Beer Styles</option>
+    </select>
+    Brewery: <input type="text" id="BreweryTextBox">
+    Beer: <input type="text" id="BeerTextBox">
+    Exclude rated items: <input type="checkbox" id="ExcludeRatedCheckbox">
+    <button id="SearchButton">Search</button>
+</div>
+
+<div id="SearchResults">
+    <table id="SearchResultsTable">
+        <thead>
+            <tr>
+                <th>Brewery</th>
+                <th>Beer</th>
+                <th>Style</th>
+                <th>Rating</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+    <span hidden id="TotalResults"></span>
+    <a hidden id="PageBackLink">back</a>
+    <a hidden id="PageForwardLink">next</a>
+</div>
+
+<div id="RateModal" class="modal">
+  <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      Overall:
+      <select id="OverallRatingSelect">
+        <option>0.5</option>
+        <option>1</option>
+        <option>1.5</option>
+        <option>2</option>
+        <option>2.5</option>
+        <option>3</option>
+        <option>3.5</option>
+        <option>4</option>
+        <option>4.5</option>
+        <option>5</option>
+    </select>
+      Palate:
+      <select id="PalateRatingSelect">
+        <option>0.5</option>
+        <option>1</option>
+        <option>1.5</option>
+        <option>2</option>
+        <option>2.5</option>
+        <option>3</option>
+        <option>3.5</option>
+        <option>4</option>
+        <option>4.5</option>
+        <option>5</option>
+    </select>
+      Taste:
+      <select id="TasteRatingSelect">
+        <option>0.5</option>
+        <option>1</option>
+        <option>1.5</option>
+        <option>2</option>
+        <option>2.5</option>
+        <option>3</option>
+        <option>3.5</option>
+        <option>4</option>
+        <option>4.5</option>
+        <option>5</option>
+    </select>
+      Aroma:
+      <select id="AromaRatingSelect">
+        <option>0.5</option>
+        <option>1</option>
+        <option>1.5</option>
+        <option>2</option>
+        <option>2.5</option>
+        <option>3</option>
+        <option>3.5</option>
+        <option>4</option>
+        <option>4.5</option>
+        <option>5</option>
+    </select>
+      Appearance:
+      <select id="AppearanceRatingSelect">
+        <option>0.5</option>
+        <option>1</option>
+        <option>1.5</option>
+        <option>2</option>
+        <option>2.5</option>
+        <option>3</option>
+        <option>3.5</option>
+        <option>4</option>
+        <option>4.5</option>
+        <option>5</option>
+    </select>
+      <button id="SubmitRatingButton">submit</button>
+  </div>
+
+</div>
+
+</body>
+</html>
