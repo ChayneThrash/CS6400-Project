@@ -62,8 +62,6 @@ def get_search_total(user, beer_name, brewery_name, styles, exclude_rated):
     with neo4jDriver.session() as session:
         with session.begin_transaction() as tx:
             results = tx.run(''' 
-                    match   (u:User {ProfileName: {Username}})-[r:REVIEWED]->(b:Beer)
-                    with    collect({overallScore: r.Overall, beer: b}) as reviewSummary
                     match   (brewery:Brewery)<-[:BREWED_BY]-(beer:Beer)-[:IS_STYLE]->(style:BeerStyle)
                     where   brewery.Name =~ {BreweryName} 
                         AND beer.Name =~ {BeerName} 
@@ -71,8 +69,8 @@ def get_search_total(user, beer_name, brewery_name, styles, exclude_rated):
                                 WHEN size({Styles}) = 0 THEN true 
                                 ELSE style.Style in {Styles}
                             END
-                    WITH    beer, filter(x IN reviewSummary WHERE x.beer = beer) as beerReview
-                    WHERE   NOT {ExcludeRated} OR size(beerReview) = 0
+                    optional match (u:User {ProfileName: {Username}})-[r:REVIEWED]->(beer)
+                    WHERE   NOT {ExcludeRated} OR r is null
                     return  count(distinct beer) as TotalBeers''',
                              Username=user, BreweryName=brewery_name_regex, BeerName=beer_name_regex, Styles=styles,
                              ExcludeRated=exclude_rated)
@@ -85,8 +83,6 @@ def get_search_results(user, beer_name, brewery_name, styles, exclude_rated, res
     with neo4jDriver.session() as session:
         with session.begin_transaction() as tx:
             results = tx.run(''' 
-                match   (u:User {ProfileName: {Username}})-[r:REVIEWED]->(b:Beer)
-                with    collect({overallScore: r.Overall, beer: b}) as reviewSummary
                 match   (brewery:Brewery)<-[:BREWED_BY]-(beer:Beer)-[:IS_STYLE]->(style:BeerStyle)
                 where   brewery.Name =~ {BreweryName} 
                     AND beer.Name =~ {BeerName} 
@@ -94,12 +90,12 @@ def get_search_results(user, beer_name, brewery_name, styles, exclude_rated, res
                             WHEN size({Styles}) = 0 THEN true 
                             ELSE style.Style in {Styles}
                         END
-                WITH    brewery, beer, style, filter(x IN reviewSummary WHERE x.beer = beer) as beerReview
-                WHERE   NOT {ExcludeRated} OR size(beerReview) = 0
+                optional match (u:User {ProfileName: {Username}})-[r:REVIEWED]->(beer)
+                WHERE   NOT {ExcludeRated} OR r is null
                 WITH    brewery, beer, style, 
                         CASE 
-                            WHEN size(beerReview) = 0 THEN -1 
-                            ELSE head(beerReview).overallScore 
+                            WHEN r is null THEN -1 
+                            ELSE r.Overall
                         END as rating
                 return  brewery.Name AS Brewery, beer.Id AS BeerId, beer.Name AS Beer, style.Style AS Style, toFloat(rating)/10.0 AS rating
                 ORDER BY brewery.Name, beer.Name, style.Style LIMIT 10''',
