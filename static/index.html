@@ -60,6 +60,9 @@
                     optGroup.click(() => {
                         optGroup.children("option").prop("selected", "selected");
                     });
+                    optGroup.children("option").click(function(e) {
+                        e.stopPropagation();
+                   });
                     $('#StylesDropdown').append(optGroup);
                 });
             });
