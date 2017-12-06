@@ -37,6 +37,43 @@ def rate():
     beerId = request.json["beer"]
     addRating("cthrash", beerId, rating)
 
+@post('/recommendations')
+def get_recommendations():
+    search = request.json
+    return dict(items=get_recommendations_for_user("cthrash", search["breweryName"], search["styles"]))
+
+def get_recommendations_for_user(user, brewery_name, styles):
+    brewery_name_regex = ".*(?i)" + brewery_name + ".*"
+    with neo4jDriver.session() as session:
+        with session.begin_transaction() as tx:
+            results = tx.run('''
+                match   (u:User {ProfileName: {Username}})-[r:REVIEWED]->(b:Beer)-[s:SIMILARITY]-(bSim:Beer),
+                        (bSim)-[:IS_STYLE]->(style:BeerStyle)<-[:HAS_SUBTYPE]-(specificStyle:SpecificStyle),
+                        (bSim)-[:BREWED_BY]->(brew:Brewery)
+                where   brew.Name =~ {BreweryName}
+                    AND CASE 
+                            WHEN size({Styles}) = 0 THEN true 
+                            ELSE style.Style in {Styles}
+                        END
+                optional match
+                        (bSim)<-[r2:REVIEWED]-(u)
+                with    bSim, brew, style, specificStyle, s, r, r2
+                where   r2 is null
+                with    bSim, brew, style, specificStyle,
+                        case 
+                            when count(s) = 1 then r.Overall*s.similarity 
+                            else sum(r.Overall*s.similarity)/sum(abs(s.similarity)) 
+                        end as prediction
+                return  bSim.Name as BeerName, brew.Name as BreweryName, style.Style as Style, prediction as Predicted
+                order by prediction desc 
+                limit 10''', Username=user, BreweryName=brewery_name_regex, Styles=styles)
+            formatted_results = []
+            for record in results:
+                formatted_result = dict(beer=record["BeerName"], brewery=record["BreweryName"],
+                                        style=record["Style"], predicted=record["Predicted"])
+                formatted_results.append(formatted_result)
+            return formatted_results
+
 def addRating(user, beerId, rating):
     overall = int(rating["overall"] * 10)
     palate = int(rating["palate"] * 10)

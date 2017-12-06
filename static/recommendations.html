@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Beer Recommendations</title>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+    <style>
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            padding-top: 100px; /* Location of the box */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgb(0,0,0); /* Fallback color */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+
+        /* The Close Button */
+        .close {
+            color: #aaaaaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        </style>
+    <script>
+        $(document).ready(function() {
+            $("#SearchButton").click(search);
+            getBeerStyles(function(results) {
+                var resultsKeys = Object.keys(results);
+                resultsKeys.sort();
+                $.each(resultsKeys, function(index, specific) {
+                    var styles = results[specific];
+                    var optGroup = $('<optgroup label="' + specific + '" />');
+                    $.each(styles, (i, style) => {
+                        var option = $("<option></option>");
+                        option.attr("value",style).text(style);
+                        optGroup.append(option);
+                    });
+
+                    optGroup.click(() => {
+                        optGroup.children("option").prop("selected", "selected");
+                    });
+                    optGroup.children("option").click(function(e) {
+                        e.stopPropagation();
+                   });
+                    $('#StylesDropdown').append(optGroup);
+                });
+            });
+        });
+
+        function getBeerStyles(next) {
+            $.ajax(
+            {
+                url: "/getStyles",
+                method: "POST",
+                success: next
+            });
+        }
+
+        function search() {
+            $.ajax(
+            {
+                url: "/recommendations",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(
+                {
+                    breweryName: $("#BreweryTextBox").val(),
+                    styles: $("#StylesDropdown").val().filter(style => style)
+                }),
+                success: drawSearchResults
+            });
+        }
+
+        function drawSearchResults(results) {
+            $("#SearchResultsTable tbody tr").remove();
+            $.each(results.items, (index, value) =>
+            {
+                var row = document.getElementById("SearchResultsTable").tBodies[0].insertRow(-1);
+                row.setAttribute("value", value.beerId);
+
+                var breweryCell = row.insertCell(0);
+                var beerCell = row.insertCell(1);
+                var styleCell = row.insertCell(2);
+                var ratingCell = row.insertCell(3);
+
+                breweryCell.innerHTML = value.brewery;
+                beerCell.innerHTML = value.beer;
+                styleCell.innerHTML = value.style;
+                ratingCell.innerHTML = value.predicted;
+            });
+        }
+
+    </script>
+</head>
+<body>
+
+<div id="SearchContainer">
+    <select multiple id="StylesDropdown">
+        <option value="" selected disabled>Beer Styles</option>
+    </select>
+    Brewery: <input type="text" id="BreweryTextBox">
+    <button id="SearchButton">Search</button>
+</div>
+
+<div id="SearchResults">
+    <table id="SearchResultsTable">
+        <thead>
+            <tr>
+                <th>Brewery</th>
+                <th>Beer</th>
+                <th>Style</th>
+                <th>Predicted Rating</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>
