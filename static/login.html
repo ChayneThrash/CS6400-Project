@@ -61,11 +61,36 @@ span.psw {
     }
 }
 </style>
+<script src="jquery-3.2.1.js"></script>
+<script>
+  $(document).ready(function() {
+    $("#loginButton").click(function() {
+      $.ajax(
+      {
+          url: "/login",
+          method: "POST",
+          contentType: "application/json",
+          data: JSON.stringify(
+          {
+              "username": $("#usernameTextBox").val(),
+              "password": $("#passwordTextBox").val()
+          }),
+          success: function(results) {
+            if (results.success) {
+              window.location = 'index.html';
+            } else {
+              alert("invalid username and password");
+            }
+          }
+      });
+    })
+  });
+</script>
 <body>
 
 <h2>Beer Recommender Login</h2>
 
-<form action='file:///Users/taliahicks/Desktop/Databases/Project/CS6400-Project/static/index.html'> <!-- update index path-->
+<div> <!-- update index path-->
 
   <div class="imgcontainer">
     <img src="beer.png" alt="Avatar" class="avatar">
@@ -73,24 +98,24 @@ span.psw {
 
   <div class="container">
     <label><b>Username</b></label>
-    <input type="text" placeholder="Enter Username" name="uname" required>
+    <input type="text" placeholder="Enter Username" id="usernameTextBox" name="uname" required>
 
     <label><b>Password</b></label>
-    <input type="password" placeholder="Enter Password" name="psw" required>
+    <input type="password" placeholder="Enter Password" id="passwordTextBox" name="psw" required>
 
-    <button type="submit">Login</button>
+    <button type="button" id="loginButton">Login</button>
   </div>
 
   <div class="container" style="background-color:#f1f1f1">
   </div>
-</form>
+</div>
 
-<button onclick="myFunction()">New User Register</button>
+<button onclick="myFunction()">Register</button>
 
 
 <script>
 function myFunction() {
-    window.open('file:///Users/taliahicks/Desktop/Databases/Project/CS6400-Project/registration.html');
+    window.open('registration.html');
 }
 </script>
 

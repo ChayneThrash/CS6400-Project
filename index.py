@@ -1,7 +1,9 @@
-from bottle import route, run, static_file, post, request
+from bottle import route, run, static_file, post, request, app
 from neo4j.v1 import GraphDatabase, basic_auth
 from settings import password, username
+from beaker.middleware import SessionMiddleware
 import time, threading
+
 
 neo4jDriver = GraphDatabase.driver("bolt:localhost:7687", auth=basic_auth(username, password))
 
@@ -12,8 +14,8 @@ def server_static(filename):
 @post('/search')
 def search_beers():
     search = request.json
-    total_results = get_search_total("cthrash", search["beerName"], search["breweryName"], search["styles"], search["excludeRated"])
-    search_results = get_search_results("cthrash", search["beerName"], search["breweryName"], search["styles"], search["excludeRated"], 10)
+    total_results = get_search_total(get_user(), search["beerName"], search["breweryName"], search["styles"], search["excludeRated"])
+    search_results = get_search_results(get_user(), search["beerName"], search["breweryName"], search["styles"], search["excludeRated"], 10)
     return dict(total=total_results, items=search_results)
 
 @post('/getStyles')
@@ -36,12 +38,40 @@ def get_styles():
 def rate():
     rating = request.json["rating"]
     beerId = request.json["beer"]
-    addRating("cthrash", beerId, rating)
+    addRating(get_user(), beerId, rating)
+
+@post('/login')
+def login():
+    uname = request.json["username"]
+    pwd = request.json["password"]
+    return dict(success=user_credentials_are_valid(uname, pwd))
+
+def user_credentials_are_valid(uname, pwd):
+    with neo4jDriver.session() as session:
+        with session.begin_transaction() as tx:
+            results = tx.run('''
+                match   (u:User {ProfileName: {Username}}) 
+                where   u.password = {Password}
+                return  u.ProfileName as Username''', Username=uname, Password=pwd)
+            if results is not None:
+                result = results.single()
+                if result is not None:
+                    s = request.environ.get('beaker.session')
+                    s['user'] = result["Username"]
+                    s.save()
+                    return True
+            return False
+
 
 @post('/recommendations')
 def get_recommendations():
     search = request.json
-    return dict(items=get_recommendations_for_user("cthrash", search["breweryName"], search["styles"]))
+    return dict(items=get_recommendations_for_user(get_user(), search["breweryName"], search["styles"]))
+
+def get_user():
+    s = request.environ.get('beaker.session')
+    user = s['user']
+    return user if user is not None else ""
 
 def get_recommendations_for_user(user, brewery_name, styles):
     brewery_name_regex = ".*(?i)" + brewery_name + ".*"
@@ -199,4 +229,13 @@ def run_update_model():
 update_thread = threading.Thread(target=run_update_model)
 update_thread.start()
 
-run(host='localhost', port=8080)
+
+session_opts = {
+    'session.type': 'file',
+    'session.cookie_expires': 300,
+    'session.data_dir': './data',
+    'session.auto': True
+}
+app = SessionMiddleware(app(), session_opts)
+
+run(app=app, host='localhost', port=8080)
