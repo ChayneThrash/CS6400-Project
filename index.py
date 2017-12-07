@@ -1,6 +1,7 @@
 from bottle import route, run, template, static_file, get, post, request
 from neo4j.v1 import GraphDatabase, basic_auth
 from settings import password, username
+import time, threading
 
 neo4jDriver = GraphDatabase.driver("bolt:localhost:7687", auth=basic_auth(username, password))
 
@@ -89,7 +90,9 @@ def addRating(user, beerId, rating):
                 SET     r.Palate = {Palate}
                 SET     r.Taste = {Taste}
                 SET     r.Appearance = {Appearance}
-                SET     r.Aroma = {Aroma}''',
+                SET     r.Aroma = {Aroma}
+                MERGE  (review:QueuedReview {ProfileName: {Username}, BeerId: {BeerId}})
+                SET     review.QueuedAt = timestamp()''',
                              Username=user, BeerId=beerId, Overall=overall, Palate=palate, Taste=taste,
                              Aroma=aroma, Appearance=appearance)
 
@@ -149,6 +152,51 @@ def get_search_results(user, beer_name, brewery_name, styles, exclude_rated, res
             return formatted_results
 
 
+def update_model_with_queued_reviews():
+    with neo4jDriver.session() as session:
+        with session.begin_transaction() as tx:
+            tx.run('''
+                match   (q:QueuedReview)
+                with    q order by q.QueuedAt asc limit 1
+                match   (b:Beer {Id: q.BeerId})<-[r1:REVIEWED]-(u:User)-[r2:REVIEWED]->(b2:Beer)
+                where   b <> b2
+                match   (b2)<-[:REVIEWED]-(u2:User {ProfileName: q.ProfileName})
+                optional match (u)-[ur:REVIEWED]->()
+                with    b, b2, r1, r2, q, u, 
+                        avg(ur.Overall) as ao, avg(ur.Palate) as ap, 
+                        avg(ur.Aroma) as aar, avg(ur.Appearance) as aap, 
+                        avg(ur.Taste) as at
+                with    b, b2, q,
+                        sum((r1.Overall - ao)*(r2.Overall - ao)) as dotproduct, 
+                        sqrt(sum((r1.Overall - ao)^2)) * sqrt(sum((r2.Overall - ao)^2)) as bottomHalf,
+                        sum((r1.Aroma - aar)* (r2.Aroma - aar)) as dotproductAroma, 
+                        sqrt(sum((r1.Aroma - aar)^2)) * sqrt(sum((r2.Aroma - aar)^2)) as bottomHalfAroma,
+                        sum((r1.Appearance - aap) * (r2.Appearance - aap)) as dotproductAppearance, 
+                        sqrt(sum((r1.Appearance - aap)^2)) * sqrt(sum((r2.Appearance - aap)^2)) as bottomHalfAppearance,
+                        sum((r1.Palate - ap) * (r2.Palate - ap)) as dotproductPalate, 
+                        sqrt(sum((r1.Palate - ap)^2)) * sqrt(sum((r2.Palate - ap)^2)) as bottomHalfPalate,
+                        sum((r1.Taste - at) * (r2.Taste - at)) as dotproductTaste, 
+                        sqrt(sum((r1.Taste - at)^2)) * sqrt(sum((r2.Taste - at)^2)) as bottomHalfTaste,
+                        count(u) as userCount
+                where   userCount > 1
+                with    b, b2, q, 
+                        case when dotproduct = 0 then 0 else dotproduct/bottomHalf end as overallSim,
+                        case when dotproductAroma = 0 then 0 else dotproductAroma/bottomHalfAroma end as aromaSim,
+                        case when dotproductAppearance = 0 then 0 else dotproductAppearance/bottomHalfAppearance end as appearanceSim,
+                        case when dotproductPalate = 0 then 0 else dotproductPalate/bottomHalfPalate end as palateSim,
+                        case when dotproductTaste = 0 then 0 else dotproductTaste/bottomHalfTaste end as tasteSim
+                with    b, b2, (overallSim + aromaSim + appearanceSim + palateSim + tasteSim)/5 as similarity, q
+                MERGE   (b)-[s:SIMILARITY]-(b2)
+                SET     s.similarity = similarity
+                DELETE  q
+                ''')
 
+def run_update_model():
+    while True:
+        update_model_with_queued_reviews()
+        time.sleep(10)
+
+update_thread = threading.Thread(target=run_update_model)
+update_thread.start()
 
 run(host='localhost', port=8080)
