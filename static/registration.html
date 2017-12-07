@@ -58,7 +58,7 @@ button {
 
 <h2>User Registration Form</h2>
 
-<form action="addUser()" style="border:1px solid #ccc">
+
   <div class="container">
     <label><b>Username</b></label>
     <input type="text" placeholder="Enter Username" name="username" required>
@@ -75,14 +75,21 @@ button {
       <button type="submit" id = "register" class="signupbtn">Sign Up</button>
     </div>
   </div>
-</form>
 
 <script>
 function myFunction() {
     window.location= 'login.html';
 }
 </script>
-<script> src = "jquery-3.2.1.js"></script>
+
+<script>
+function go_to_recommender() {
+  window.location = 'index.html';
+
+}
+</script>
+
+<script src="jquery-3.2.1.js"></script>
 <script>
 $(document).ready(function() {
     $("#register").click(function() {
@@ -97,19 +104,14 @@ $(document).ready(function() {
         'username': $("#usernameTextBox").val(),
         'password': $("#passwordTextBox").val()
       }),
-      success: function(go_to_recommender)
+      success: go_to_recommender
     });
   })
 });
 
 </script>
 
-<script>
-function go_to_recommender() {
-  window.location = 'http://localhost:8080/static/index.html';
 
-})
-</script>
 
 
 </body>

@@ -4,7 +4,6 @@ from settings import password, username
 from beaker.middleware import SessionMiddleware
 import time, threading
 
-
 neo4jDriver = GraphDatabase.driver("bolt:localhost:7687", auth=basic_auth(username, password))
 
 @route('/static/<filename>')
@@ -63,16 +62,16 @@ def user_credentials_are_valid(uname, pwd):
             return False
 
 @post('/addUser')
-def add_user(username, password, psw):
-    uname = request.json["username"]
-    pwd = request.json["password"]
+def add_user():
+
     search = request.json
     with neo4jDriver.session() as session:
             with session.begin_transaction()as tx:
                 tx.run('''
-                    CREATE (u:User {ProfileName: {username}, Password: {psw}),
+                    CREATE (u:User {ProfileName: {username}, Password: {pwd}),
                     ''',
-                    username = search['username'], password = search['psw')
+                    username = search['username'], password = search['pwd'])
+
 
 @post('/recommendations')
 def get_recommendations():
@@ -81,7 +80,8 @@ def get_recommendations():
 
 def get_user():
     s = request.environ.get('beaker.session')
-    return s['user'] if "user" in s else ""
+    user = s['user']
+    return user if user is not None else ""
 
 def get_recommendations_for_user(user, brewery_name, styles):
     brewery_name_regex = ".*(?i)" + brewery_name + ".*"
