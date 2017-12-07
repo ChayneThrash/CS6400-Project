@@ -81,8 +81,7 @@ def get_recommendations():
 
 def get_user():
     s = request.environ.get('beaker.session')
-    user = s['user']
-    return user if user is not None else ""
+    return s['user'] if "user" in s else ""
 
 def get_recommendations_for_user(user, brewery_name, styles):
     brewery_name_regex = ".*(?i)" + brewery_name + ".*"
