@@ -72,7 +72,7 @@ button {
     <div class="clearfix">
       <button type="button" onclick="myFunction()" class="cancelbtn">Cancel</button>
 
-      <button type="submit" class="signupbtn">Sign Up</button>
+      <button type="submit" id = "register" class="signupbtn">Sign Up</button>
     </div>
   </div>
 </form>
@@ -82,27 +82,31 @@ function myFunction() {
     window.open('login.html');
 }
 </script>
-
+<script> src = "jquery-33.2.1.js"></script>
 <script>
-function addUser() {
-  $ajax (
+$(document).ready(function() {
+    $("#register").click(function() {
+  $.ajax (
     {
       url:"/addUser",
       method: "POST",
-      success: go_to_recommender()
+      contentType: "application/json",
 
-      data: JSON.stringify({
-        uName: $("#username").val,
-        password: $("#psw").val
-      })
-
+      data: JSON.stringify(
+        {
+        'username': $("#usernameTextBox").val(),
+        password: $("#passwordTextBox").val()
+      }),
+      success: funtion(go_to_recommender)
     });
-}
+  })
+});
+
 </script>
 
 <script>
-function go_to_recommender(0 { 
-  window.open('http://localhost:8080/static/index.html');
+function go_to_recommender() {
+  window.location = 'http://localhost:8080/static/index.html';
 
 })
 </script>
