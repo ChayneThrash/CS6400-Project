@@ -79,10 +79,10 @@ button {
 
 <script>
 function myFunction() {
-    window.open('login.html');
+    window.location= 'login.html';
 }
 </script>
-<script> src = "jquery-33.2.1.js"></script>
+<script> src = "jquery-3.2.1.js"></script>
 <script>
 $(document).ready(function() {
     $("#register").click(function() {
@@ -95,7 +95,7 @@ $(document).ready(function() {
       data: JSON.stringify(
         {
         'username': $("#usernameTextBox").val(),
-        password: $("#passwordTextBox").val()
+        'password': $("#passwordTextBox").val()
       }),
       success: funtion(go_to_recommender)
     });
