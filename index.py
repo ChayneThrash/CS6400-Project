@@ -50,7 +50,7 @@ def user_credentials_are_valid(uname, pwd):
     with neo4jDriver.session() as session:
         with session.begin_transaction() as tx:
             results = tx.run('''
-                match   (u:User {ProfileName: {Username}}) 
+                match   (u:User {ProfileName: {Username}})
                 where   u.password = {Password}
                 return  u.ProfileName as Username''', Username=uname, Password=pwd)
             if results is not None:
@@ -62,6 +62,15 @@ def user_credentials_are_valid(uname, pwd):
                     return True
             return False
 
+@post('/addUser')
+def add_user(username, password):
+    search = request.json
+    with neo4jDriver.session() as session:
+            with session.begin_transaction()as tx:
+                tx.run('''
+                    CREATE (u:User {ProfileName: {username}, Password: {password}),
+                    ''',
+                    username = search['uName'], password = search['password')
 
 @post('/recommendations')
 def get_recommendations():
@@ -82,8 +91,8 @@ def get_recommendations_for_user(user, brewery_name, styles):
                         (bSim)-[:IS_STYLE]->(style:BeerStyle)<-[:HAS_SUBTYPE]-(specificStyle:SpecificStyle),
                         (bSim)-[:BREWED_BY]->(brew:Brewery)
                 where   brew.Name =~ {BreweryName}
-                    AND CASE 
-                            WHEN size({Styles}) = 0 THEN true 
+                    AND CASE
+                            WHEN size({Styles}) = 0 THEN true
                             ELSE style.Style in {Styles}
                         END
                 optional match
@@ -91,12 +100,12 @@ def get_recommendations_for_user(user, brewery_name, styles):
                 with    bSim, brew, style, specificStyle, s, r, r2
                 where   r2 is null
                 with    bSim, brew, style, specificStyle,
-                        case 
-                            when count(s) = 1 then r.Overall*s.similarity 
-                            else sum(r.Overall*s.similarity)/sum(abs(s.similarity)) 
+                        case
+                            when count(s) = 1 then r.Overall*s.similarity
+                            else sum(r.Overall*s.similarity)/sum(abs(s.similarity))
                         end as prediction
                 return  bSim.Name as BeerName, brew.Name as BreweryName, style.Style as Style, prediction/10 as Predicted
-                order by prediction desc 
+                order by prediction desc
                 limit 10''', Username=user, BreweryName=brewery_name_regex, Styles=styles)
             formatted_results = []
             for record in results:
@@ -131,12 +140,12 @@ def get_search_total(user, beer_name, brewery_name, styles, exclude_rated):
     beer_name_regex = ".*(?i)" + beer_name + ".*"
     with neo4jDriver.session() as session:
         with session.begin_transaction() as tx:
-            results = tx.run(''' 
+            results = tx.run('''
                     match   (brewery:Brewery)<-[:BREWED_BY]-(beer:Beer)-[:IS_STYLE]->(style:BeerStyle)
-                    where   brewery.Name =~ {BreweryName} 
-                        AND beer.Name =~ {BeerName} 
-                        AND CASE 
-                                WHEN size({Styles}) = 0 THEN true 
+                    where   brewery.Name =~ {BreweryName}
+                        AND beer.Name =~ {BeerName}
+                        AND CASE
+                                WHEN size({Styles}) = 0 THEN true
                                 ELSE style.Style in {Styles}
                             END
                     optional match (u:User {ProfileName: {Username}})-[r:REVIEWED]->(beer)
@@ -153,20 +162,20 @@ def get_search_results(user, beer_name, brewery_name, styles, exclude_rated, res
     beer_name_regex = ".*(?i)" + beer_name + ".*"
     with neo4jDriver.session() as session:
         with session.begin_transaction() as tx:
-            results = tx.run(''' 
+            results = tx.run('''
                 match   (brewery:Brewery)<-[:BREWED_BY]-(beer:Beer)-[:IS_STYLE]->(style:BeerStyle)
-                where   brewery.Name =~ {BreweryName} 
-                    AND beer.Name =~ {BeerName} 
-                    AND CASE 
-                            WHEN size({Styles}) = 0 THEN true 
+                where   brewery.Name =~ {BreweryName}
+                    AND beer.Name =~ {BeerName}
+                    AND CASE
+                            WHEN size({Styles}) = 0 THEN true
                             ELSE style.Style in {Styles}
                         END
                 optional match (u:User {ProfileName: {Username}})-[r:REVIEWED]->(beer)
                 WITH    brewery, beer, style, r
                 WHERE   NOT {ExcludeRated} OR r is null
-                WITH    brewery, beer, style, 
-                        CASE 
-                            WHEN r is null THEN -1 
+                WITH    brewery, beer, style,
+                        CASE
+                            WHEN r is null THEN -1
                             ELSE r.Overall
                         END as rating
                 return  brewery.Name AS Brewery, beer.Id AS BeerId, beer.Name AS Beer, style.Style AS Style, toFloat(rating)/10.0 AS rating
@@ -192,24 +201,24 @@ def update_model_with_queued_reviews():
                 where   b <> b2
                 match   (b2)<-[:REVIEWED]-(u2:User {ProfileName: q.ProfileName})
                 optional match (u)-[ur:REVIEWED]->()
-                with    b, b2, r1, r2, q, u, 
-                        avg(ur.Overall) as ao, avg(ur.Palate) as ap, 
-                        avg(ur.Aroma) as aar, avg(ur.Appearance) as aap, 
+                with    b, b2, r1, r2, q, u,
+                        avg(ur.Overall) as ao, avg(ur.Palate) as ap,
+                        avg(ur.Aroma) as aar, avg(ur.Appearance) as aap,
                         avg(ur.Taste) as at
                 with    b, b2, q,
-                        sum((r1.Overall - ao)*(r2.Overall - ao)) as dotproduct, 
+                        sum((r1.Overall - ao)*(r2.Overall - ao)) as dotproduct,
                         sqrt(sum((r1.Overall - ao)^2)) * sqrt(sum((r2.Overall - ao)^2)) as bottomHalf,
-                        sum((r1.Aroma - aar)* (r2.Aroma - aar)) as dotproductAroma, 
+                        sum((r1.Aroma - aar)* (r2.Aroma - aar)) as dotproductAroma,
                         sqrt(sum((r1.Aroma - aar)^2)) * sqrt(sum((r2.Aroma - aar)^2)) as bottomHalfAroma,
-                        sum((r1.Appearance - aap) * (r2.Appearance - aap)) as dotproductAppearance, 
+                        sum((r1.Appearance - aap) * (r2.Appearance - aap)) as dotproductAppearance,
                         sqrt(sum((r1.Appearance - aap)^2)) * sqrt(sum((r2.Appearance - aap)^2)) as bottomHalfAppearance,
-                        sum((r1.Palate - ap) * (r2.Palate - ap)) as dotproductPalate, 
+                        sum((r1.Palate - ap) * (r2.Palate - ap)) as dotproductPalate,
                         sqrt(sum((r1.Palate - ap)^2)) * sqrt(sum((r2.Palate - ap)^2)) as bottomHalfPalate,
-                        sum((r1.Taste - at) * (r2.Taste - at)) as dotproductTaste, 
+                        sum((r1.Taste - at) * (r2.Taste - at)) as dotproductTaste,
                         sqrt(sum((r1.Taste - at)^2)) * sqrt(sum((r2.Taste - at)^2)) as bottomHalfTaste,
                         count(u) as userCount
                 where   userCount > 1
-                with    b, b2, q, 
+                with    b, b2, q,
                         case when dotproduct = 0 then 0 else dotproduct/bottomHalf end as overallSim,
                         case when dotproductAroma = 0 then 0 else dotproductAroma/bottomHalfAroma end as aromaSim,
                         case when dotproductAppearance = 0 then 0 else dotproductAppearance/bottomHalfAppearance end as appearanceSim,
