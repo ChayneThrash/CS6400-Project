@@ -1,4 +1,4 @@
-from bottle import route, run, template, static_file, get, post, request
+from bottle import route, run, static_file, post, request
 from neo4j.v1 import GraphDatabase, basic_auth
 from settings import password, username
 import time, threading
