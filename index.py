@@ -64,7 +64,7 @@ def get_recommendations_for_user(user, brewery_name, styles):
                             when count(s) = 1 then r.Overall*s.similarity 
                             else sum(r.Overall*s.similarity)/sum(abs(s.similarity)) 
                         end as prediction
-                return  bSim.Name as BeerName, brew.Name as BreweryName, style.Style as Style, prediction as Predicted
+                return  bSim.Name as BeerName, brew.Name as BreweryName, style.Style as Style, prediction/10 as Predicted
                 order by prediction desc 
                 limit 10''', Username=user, BreweryName=brewery_name_regex, Styles=styles)
             formatted_results = []
