@@ -63,14 +63,16 @@ def user_credentials_are_valid(uname, pwd):
             return False
 
 @post('/addUser')
-def add_user(username, password):
+def add_user(username, password, psw):
+    uname = request.json["username"]
+    pwd = request.json["password"]
     search = request.json
     with neo4jDriver.session() as session:
             with session.begin_transaction()as tx:
                 tx.run('''
-                    CREATE (u:User {ProfileName: {username}, Password: {password}),
+                    CREATE (u:User {ProfileName: {username}, Password: {psw}),
                     ''',
-                    username = search['uName'], password = search['password')
+                    username = search['username'], password = search['psw')
 
 @post('/recommendations')
 def get_recommendations():
