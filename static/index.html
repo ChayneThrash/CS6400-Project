@@ -43,6 +43,8 @@
         }
         </style>
     <script>
+
+        var isLoggedIn = false;
         $(document).ready(function() {
             $("#SearchButton").click(search);
             getBeerStyles(function(results) {
@@ -67,6 +69,21 @@
                 });
             });
         });
+
+        function checkIfLoggedIn() {
+            $.ajax(
+            {
+                url: "/isLoggedIn",
+                method: "POST",
+                success: function(result) {
+                    if (result.isLoggedIn) {
+                        isLoggedIn = true;
+                    } else {
+                        ("#ExcludeRatedCheckbox").prop("disabled", true);
+                    }
+                }
+            });
+        }
 
         function getBeerStyles(next) {
             $.ajax(
@@ -116,13 +133,15 @@
                 var ratingLink = document.createElement('a');
                 ratingLink.onclick = () => openModal(value.beerId);
                 ratingLink.href = "#";
-                var linkText;
+                var linkText = document.createTextNode("");
                 if (value.rating < 0) {
                     ratingCell.innerHTML = "N/A"
-                    linkText = document.createTextNode("Add Rating");
+                    if (isLoggedIn)
+                        linkText = document.createTextNode("Add Rating");
                 } else {
                     ratingCell.innerHTML = value.rating;
-                    linkText = document.createTextNode("Update Rating");
+                    if (isLoggedIn)
+                        linkText = document.createTextNode("Update Rating");
                 }
                 ratingLink.appendChild(linkText);
 
